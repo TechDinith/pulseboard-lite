@@ -1,9 +1,29 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# PulseBoard Lite — monorepo
 
-# This is NOT the Next.js you know
+Multi-tenant team task board. One repo, several independent services.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+| Path | Stack | Status |
+| --- | --- | --- |
+| `frontend/` | Next.js 16, React 19, TypeScript, Tailwind v4, Redux Toolkit + RTK Query | Steps 1–2 done |
+| `backend/` | Spring Boot 4, PostgreSQL, JWT (Maven) | Step 3 done |
+| `sse-service/` | Node.js SSE + Redis Pub/Sub | Step 6 (planned) |
+| `worker/` | Node.js SQS export worker | Step 8 (planned) |
+| `docker-compose.yml` | local Postgres (+ later Redis, LocalStack) | running |
+| `PROGRESS.md` | running project memory — update at the end of every step | — |
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+Each service owns its own toolchain and `node_modules` / `target`. Nothing at the
+root except composition: container config, docs, CI, and this file.
 
-<!-- END:nextjs-agent-rules -->
+## Frontend / Next.js agents
+
+Next-specific rules live in `frontend/AGENTS.md` — `next dev` re-generates that
+file inside the app directory. Read it before writing any code under `frontend/`.
+
+The bundled Next docs are at `frontend/node_modules/next/dist/docs/`.
+
+## Backend
+
+```
+cd backend
+.\mvnw.cmd spring-boot:run      # requires: docker compose up -d postgres
+```
