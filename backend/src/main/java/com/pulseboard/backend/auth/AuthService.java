@@ -39,13 +39,15 @@ public class AuthService {
   @Transactional
   public AuthResponse register(RegisterRequest request) {
     String email = normalizeEmail(request.email());
-    if (userRepository.existsByEmail(email)) {
+    String tenantSlug = slugify(request.tenantName());
+
+    Tenant tenant = tenantRepository.findBySlug(tenantSlug)
+        .orElseGet(() -> tenantRepository.save(
+            new Tenant(tenantSlug, request.tenantName().trim(), Plan.FREE)));
+
+    if (userRepository.existsByTenantIdAndEmail(tenant.getId(), email)) {
       throw ApiException.conflict("email_taken", "Email is already registered");
     }
-
-    Tenant tenant = tenantRepository.findBySlug(slugify(request.tenantName()))
-        .orElseGet(() -> tenantRepository.save(
-            new Tenant(slugify(request.tenantName()), request.tenantName().trim(), Plan.FREE)));
 
     User user = new User(
         tenant,

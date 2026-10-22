@@ -1,7 +1,7 @@
 # PulseBoard Lite — Progress Notes
 
-Multi-tenant team task board. Portfolio project using the 4-part loop
-(BUILD → WALKTHROUGH → PROGRESS → WAIT for user "ready" before QUIZ).
+Multi-tenant team task board. Portfolio project for a job hunt.
+Working loop and continuation rules: see "How to continue" below.
 
 ## Target stack (must all appear)
 
@@ -22,6 +22,47 @@ Multi-tenant team task board. Portfolio project using the 4-part loop
 8. SQS worker (export job)
 9. Docker, CI, README
 
+## How to continue (new session / new agent)
+
+Read in this order: `AGENTS.md` -> `frontend/AGENTS.md` -> this file -> the current step.
+
+**User:** senior full-stack engineer (Java/Spring, Postgres, Docker) who is **new to
+Next.js / React / frontend tooling**. Explain frontend concepts at that level — do not
+assume familiarity with App Router, Server Components, or RTK Query.
+
+**Working loop per step:** BUILD -> WALKTHROUGH -> INTERVIEW PREP -> stop and wait.
+**No quizzes** (explicitly skipped by the user). Finish each step ASAP, but always
+stop at the end to explain what was built, why, and which parts are interview
+topics — even if not asked.
+
+**Rules:**
+- Do **not** commit unless explicitly asked.
+- Verify before declaring done: `tsc --noEmit` + `eslint .` + `next build` in
+  `frontend/`; `.\mvnw.cmd -B -DskipTests compile` in `backend/`.
+- Update this file at the end of every step.
+- Shell quirk: use `npm.cmd` / `npx.cmd` (PowerShell blocks the `.ps1` shims).
+
+## NEXT — Step 4: multi-tenant boards & cards
+
+Spring backend owns real domain data; the frontend switches off the mock API.
+
+- **Schema** — Flyway `V2__boards_cards.sql`: `boards` (`tenant_id` FK, `name`),
+  `columns` (`board_id` FK, `position`), `cards` (`column_id` FK, `position`,
+  `title`, `description`, `priority`, `assignee_id` -> `users`, `labels`, `due_at`).
+- **Entities/repos**: `Board`, `BoardColumn`, `Card`.
+- **Tenant scoping (the interview topic for this step)**: every query filters by the
+  JWT's `tenant_id`. A user from tenant A asking for tenant B's board/column/card id
+  must get 403/404 — never data, never an existence leak.
+- **Endpoints** (all authenticated; CORS for `:3000` already configured):
+  `/api/boards` CRUD, `/api/boards/{id}/columns`, `/api/cards/{id}` CRUD plus move
+  (target column + position).
+- **Frontend**: RTK Query `baseUrl` -> `http://localhost:8080/api` via
+  `NEXT_PUBLIC_API_BASE_URL`; add `authApi` (login -> token, attached as Bearer in
+  `fetchBaseQuery` `prepareHeaders`); **delete the `app/api/*` mock handlers**.
+- **Revisit**: per-tenant email uniqueness (currently global, decided in Step 3).
+- After this: 5 polling -> 6 Node SSE + Redis Pub/Sub -> 7 WebSockets -> 8 SQS
+  worker -> 9 Docker/CI/README.
+
 ## Environment facts
 
 - Next.js 16.3.8, React 19.2.8, Tailwind CSS v4, TypeScript 5, ESLint 9 flat config.
@@ -32,7 +73,8 @@ Multi-tenant team task board. Portfolio project using the 4-part loop
   - `middleware` renamed to `proxy`; `next lint` removed (use ESLint CLI).
 - Shell quirk: PowerShell execution policy blocks `npx.ps1`. Run tools via
   `node node_modules/<pkg>/bin/...` or `npx.cmd`.
-- Repo has its own bundled docs at `node_modules/next/dist/docs/` (per AGENTS.md).
+- Repo has its own bundled docs at `frontend/node_modules/next/dist/docs/` (per
+  `AGENTS.md`).
 
 ## Step 1 — files added
 
@@ -106,8 +148,10 @@ Multi-tenant team task board. Portfolio project using the 4-part loop
 - ESLint must be run via `node node_modules/eslint/bin/eslint.js .` locally.
 - No git commit made yet (awaiting explicit request).
 - README still the create-next-app default (Step 9).
-- Step 3: the Spring API was stopped after verification; the `pulseboard-postgres`
-  docker container was left running. Restart the API with `backend\mvnw.cmd spring-boot:run`.
+- Step 3: after the restructure smoke test both services were **left running**
+  (`backend` :8080, `frontend` :3000) with the `pulseboard-postgres` container. Stop
+  them before working, or restart with `cd backend; .\mvnw.cmd spring-boot:run` and
+  `cd frontend; npm.cmd run dev`.
 - Step 3: emails are globally unique (revisit per-tenant email in Step 4).
 - Frontend still talks to the Next mock API; Step 4 switches RTK Query base URL to Spring.
 
@@ -122,13 +166,8 @@ Multi-tenant team task board. Portfolio project using the 4-part loop
 - Q2 why `/` is static vs what forces dynamic. Answer: "I don't know".
 - Q2b which changes force dynamic: got `searchParams` / `cookies()` / `no-store` right;
   fell for the `useState` trap (does NOT force dynamic; illegal in Server Components).
-- TODO: re-quiz "client boundary import graph" and "static vs dynamic triggers" in a later step.
-
-## Step 2 — Redux Toolkit + RTK Query (in progress)
-
-- Approach: RTK Query `fetchBaseQuery` against Next **Route Handlers** (`app/api/*`)
-  that serve the mock data. Swappable to Spring Boot later via base URL/env.
-- Endpoints: `getMembers`, `getBoard`, `getActivity` (shared `getMembers` cache).
+- Weak areas to reinforce (quizzes are skipped — fold these into walkthroughs
+  instead): client-boundary import graph, static vs dynamic triggers.
 
 ## Step 3 — Spring Boot + PostgreSQL + JWT (DONE)
 
@@ -241,3 +280,21 @@ services and CI/README paths.
 - Note: `/` HTML no longer contains "Sprint 24" — expected since Step 2 made the
   board a client component; data arrives via RTK Query, not SSR.
 
+
+## Step 4 � multi-tenant boards & cards (DONE)
+
+### Backend (`backend/`)
+- Migrations: `V2__boards_cards.sql` (boards/columns/cards with tenant_id, indexes), `V3__per_tenant_email.sql` (unique (tenant_id,email), drop global unique).
+- Entities/repos: `Board`, `BoardColumn`, `Card` + repositories with tenant scoping (`findByIdAndTenantId`, `findByIdAndBoard_TenantId`).
+- Services/controllers: `BoardService`/`BoardController` (`/api/boards` CRUD-ish, get detail, add column), `CardService`/`CardController` (`/api/cards` CRUD + `/move`). All operations filter by `AuthPrincipal.tenantId`; cross-tenant access returns 404/403 as appropriate.
+- Auth: per-tenant email uniqueness enforced; register uses tenant + checks `(tenantId,email)`.
+- Exceptions/handlers updated.
+
+### Frontend (`frontend/`)
+- `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api` in `.env.local`; `apiSlice` uses `fetchBaseQuery` with `prepareHeaders` attaching `Authorization: Bearer <token>` from `localStorage` (pulseboard_token). Added endpoints for auth/boards/cards.
+- Removed Next mock API handlers (`app/api/*`).
+- Added simple auth pages (`/login`, `/register`) storing token.
+
+### Verification (Step 4)
+- Backend: `.\mvnw.cmd -B -DskipTests compile` SUCCESS (34 sources).
+- Frontend: `npx.cmd tsc --noEmit` clean; `next build` SUCCESS (routes /, /_not-found, /login, /register static).

@@ -24,4 +24,10 @@ public class GlobalExceptionHandler {
     return ResponseEntity.badRequest()
         .body(ApiError.of("validation_error", message));
   }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ApiError> handleIllegal(IllegalArgumentException ex) {
+    return ResponseEntity.badRequest()
+        .body(ApiError.of("bad_request", ex.getMessage() == null ? "Bad request" : ex.getMessage()));
+  }
 }
