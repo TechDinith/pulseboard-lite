@@ -18,7 +18,7 @@ Working loop and continuation rules: see "How to continue" below.
 4. Multi-tenant boards/cards â€” **DONE**
 5. Polling â€” **DONE**
 6. Node SSE service fed by Redis Pub/Sub â€” **DONE**
-7. WebSockets
+7. WebSockets â€” **DONE**
 8. SQS worker (export job)
 9. Docker, CI, README
 
@@ -42,17 +42,15 @@ topics â€” even if not asked.
 - Update this file at the end of every step.
 - Shell quirk: use `npm.cmd` / `npx.cmd` (PowerShell blocks the `.ps1` shims).
 
-## NEXT â€” Step 7: WebSockets
+## NEXT â€” Step 8: SQS export worker
 
-Replace/augment SSE with a WebSocket channel for bidirectional updates.
+Add a Node worker that consumes export jobs from SQS and writes CSV exports.
 
-- Backend (or a dedicated gateway) publishes board mutations to Redis; clients
-  subscribe to a board room and receive live events.
-- Keep tenant scoping identical to the REST API (JWT on connect, board membership
-  check).
-- Frontend: RTK Query cache invalidation driven by socket events; fallback polling
-  remains for reconnect gaps.
-- After this: 8 SQS worker -> 9 Docker/CI/README.
+- Likely LocalStack in `docker-compose.yml` for SQS.
+- Worker reads a job (board id, tenant id, requested by), loads data from Postgres
+  or calls the backend, writes an artifact, records status.
+- Frontend/backend: an endpoint to request an export + status polling.
+- After this: 9 Docker/CI/README.
 
 ## Environment facts
 
@@ -299,17 +297,17 @@ services and CI/README paths.
 ### Verification (Step 5)
 - Frontend: `npx.cmd tsc --noEmit` clean; `next build` SUCCESS (`/boards/[id]` dynamic).
 
-## Step 6 — Node SSE service + Redis Pub/Sub (DONE)
+## Step 6 ï¿½ Node SSE service + Redis Pub/Sub (DONE)
 
 ### Backend (`backend/`)
 - `pom.xml`: added `spring-boot-starter-data-redis`.
 - `application.yml`: `spring.data.redis.host/port` from `REDIS_HOST`/`REDIS_PORT`.
-- `events/BoardEventPublisher` — serializes events with **Jackson 3** (`tools.jackson.databind.ObjectMapper`; Boot 4 does not ship `com.fasterxml`), publishes to Redis channel `board:<boardId>`.
+- `events/BoardEventPublisher` ï¿½ serializes events with **Jackson 3** (`tools.jackson.databind.ObjectMapper`; Boot 4 does not ship `com.fasterxml`), publishes to Redis channel `board:<boardId>`.
 - `BoardService`/`CardService` publish `board.created`, `column.created`, `card.created|updated|moved|deleted` after mutations (board id resolved from the card's column).
 
 ### SSE service (`sse-service/`)
-- `package.json` (ESM) — `express`, `cors`, `ioredis`.
-- `index.js` — `GET /events?boardId=...` streams `text/event-stream`; one Redis subscription per board shared by all connected clients; event name `board:update`, data = JSON message. `GET /health` returns `{status:"ok"}`. CORS restricted to `:3000`.
+- `package.json` (ESM) ï¿½ `express`, `cors`, `ioredis`.
+- `index.js` ï¿½ `GET /events?boardId=...` streams `text/event-stream`; one Redis subscription per board shared by all connected clients; event name `board:update`, data = JSON message. `GET /health` returns `{status:"ok"}`. CORS restricted to `:3000`.
 - Default port 4000 (`PORT`), Redis URL via `REDIS_URL`.
 
 ### Infra
@@ -317,10 +315,10 @@ services and CI/README paths.
 
 ### Frontend (`frontend/`)
 - `.env.local`: `NEXT_PUBLIC_SSE_URL=http://localhost:4000`.
-- `lib/use-board-events.ts` — client hook opening `EventSource`, listening for `board:update`; handler kept in a ref so re-renders don't reconnect; closes on unmount.
+- `lib/use-board-events.ts` ï¿½ client hook opening `EventSource`, listening for `board:update`; handler kept in a ref so re-renders don't reconnect; closes on unmount.
 - `/boards/[id]`: subscribes to SSE and calls RTK Query `refetch()` on events; polling kept at 30s as a safety net (SSE is primary).
 - Added `/boards` (list + create), home `/` redirects to `/boards`; auth pages use typed RTK Query results.
-- `apiSlice` fully typed (no `any`) — `AuthResult`, `BoardSummary`, `BoardDetail`, `CardSummary`, `ColumnWithCards`, create/update/move inputs.
+- `apiSlice` fully typed (no `any`) ï¿½ `AuthResult`, `BoardSummary`, `BoardDetail`, `CardSummary`, `ColumnWithCards`, create/update/move inputs.
 - Removed the leftover mock-only UI path from the active routes.
 
 ### Verification (Step 6)
@@ -332,3 +330,29 @@ services and CI/README paths.
   (Postgres/Redis containers could not start), so the full publish ? SSE ? refetch loop
   is unverified. Start Docker Desktop, `docker compose up -d`, backend, `sse-service`,
   then create a card to observe it.
+
+## Step 7 — WebSockets (DONE)
+
+### Backend (`backend/`)
+- `pom.xml`: added `spring-boot-starter-websocket`.
+- `ws/JwtHandshakeInterceptor` — verifies `?token=` during the handshake (JWT filter doesn't see WS upgrades without an Authorization header); stores `tenantId`/`userId` in session attributes; rejects with 401.
+- `ws/BoardSocketHandler` — `TextWebSocketHandler` + Redis `MessageListener`:
+  - client ? `{"type":"subscribe","boardId":"..."}`; subscription is checked against `boardRepository.findByIdAndTenantId(...)`, so cross-tenant board IDs are rejected.
+  - Redis `board:*` messages are fan-out to local sessions as `{"type":"board:update","boardId":...,"payload":{original event}}`.
+  - `unsubscribe`, `afterConnectionClosed`, and empty-room cleanup implemented.
+- `config/WebSocketConfig` — registers handler at `/ws` (origin `http://localhost:3000`) and a `RedisMessageListenerContainer` on pattern `board:*`.
+- `SecurityConfig` — `/ws` is `permitAll` at the filter-chain level; the handshake interceptor is the auth gate.
+
+### Frontend (`frontend/`)
+- `lib/use-board-socket.ts` — native `WebSocket`, token from `localStorage`, subscribe on open, exponential-backoff reconnect (1s?30s cap), closes on unmount.
+- `/boards/[id]` uses `useBoardSocket` to `refetch()` on `board:update`; polling kept at 30s as reconnect-gap fallback.
+- `.env.local`: `NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws`. SSE hook/service remain available as an alternate transport.
+
+### Verification (Step 7)
+- Backend: `.\mvnw.cmd -B -DskipTests compile` SUCCESS (38 sources).
+- Frontend: `npx.cmd tsc --noEmit` clean; `eslint .` clean; `next build` SUCCESS.
+- Runtime (Docker Desktop + Postgres + Redis + backend + sse-service):
+  - register ? create board ? connect `ws://localhost:8080/ws?token=...` ? `subscribe` ? `subscribed`.
+  - creating a card produced `board:update` with `card.created` payload (Redis ? WS fan-out) — PASS.
+  - second tenant subscribing to the first tenant's board got `{"type":"error","payload":{"message":"board not found"}}` — PASS.
+  - background processes started for the test were stopped afterwards; containers left running.

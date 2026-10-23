@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useGetBoardDetailQuery } from "@/lib/features/api/apiSlice";
-import { useBoardEvents } from "@/lib/use-board-events";
+import { useBoardSocket } from "@/lib/use-board-socket";
 
 export default function BoardDetailPage() {
   const params = useParams();
@@ -17,7 +17,7 @@ export default function BoardDetailPage() {
     refetch();
   }, [refetch]);
 
-  useBoardEvents(id, onEvent);
+  useBoardSocket(id, onEvent);
 
   if (isLoading) return <main className="p-6">Loading...</main>;
   if (error) return <main className="p-6">Error loading board.</main>;
