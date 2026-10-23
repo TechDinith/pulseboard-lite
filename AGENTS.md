@@ -4,9 +4,9 @@ Multi-tenant team task board. One repo, several independent services.
 
 | Path | Stack | Status |
 | --- | --- | --- |
-| `frontend/` | Next.js 16, React 19, TypeScript, Tailwind v4, Redux Toolkit + RTK Query | Steps 1–2 done |
-| `backend/` | Spring Boot 4, PostgreSQL, JWT (Maven) | Step 3 done |
-| `sse-service/` | Node.js SSE + Redis Pub/Sub | Step 6 (planned) |
+| `frontend/` | Next.js 16, React 19, TypeScript, Tailwind v4, Redux Toolkit + RTK Query | Steps 1–2, 4–6 done |
+| `backend/` | Spring Boot 4, PostgreSQL, JWT (Maven) | Steps 3–4 done; Redis publisher for Step 6 |
+| `sse-service/` | Node.js SSE + Redis Pub/Sub | Step 6 done |
 | `worker/` | Node.js SQS export worker | Step 8 (planned) |
 | `docker-compose.yml` | local Postgres (+ later Redis, LocalStack) | running |
 | `PROGRESS.md` | running project memory — update at the end of every step | — |

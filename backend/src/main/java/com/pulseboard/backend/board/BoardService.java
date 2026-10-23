@@ -5,6 +5,7 @@ import com.pulseboard.backend.board.dto.BoardDtos;
 import com.pulseboard.backend.card.Card;
 import com.pulseboard.backend.card.CardRepository;
 import com.pulseboard.backend.common.ApiException;
+import com.pulseboard.backend.events.BoardEventPublisher;
 import com.pulseboard.backend.tenant.Tenant;
 import com.pulseboard.backend.tenant.TenantRepository;
 import com.pulseboard.backend.user.UserRepository;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -23,13 +25,15 @@ public class BoardService {
   private final CardRepository cardRepository;
   private final TenantRepository tenantRepository;
   private final UserRepository userRepository;
+  private final BoardEventPublisher eventPublisher;
 
-  public BoardService(BoardRepository boardRepository, BoardColumnRepository columnRepository, CardRepository cardRepository, TenantRepository tenantRepository, UserRepository userRepository) {
+  public BoardService(BoardRepository boardRepository, BoardColumnRepository columnRepository, CardRepository cardRepository, TenantRepository tenantRepository, UserRepository userRepository, BoardEventPublisher eventPublisher) {
     this.boardRepository = boardRepository;
     this.columnRepository = columnRepository;
     this.cardRepository = cardRepository;
     this.tenantRepository = tenantRepository;
     this.userRepository = userRepository;
+    this.eventPublisher = eventPublisher;
   }
 
   @Transactional(readOnly = true)
@@ -44,11 +48,11 @@ public class BoardService {
     Tenant tenant = tenantRepository.findById(principal.tenantId())
         .orElseThrow(() -> ApiException.unauthorized("Unknown tenant"));
     Board board = boardRepository.save(new Board(tenant, request.name()));
-    // create default columns
     columnRepository.save(new BoardColumn(board, "Backlog", 0));
     columnRepository.save(new BoardColumn(board, "In Progress", 1));
     columnRepository.save(new BoardColumn(board, "Review", 2));
     columnRepository.save(new BoardColumn(board, "Done", 3));
+    eventPublisher.publishBoardUpdate(board.getId(), "board.created", Map.of("boardId", board.getId(), "name", board.getName()));
     return new BoardDtos.BoardResponse(board.getId(), board.getName(), board.getCreatedAt());
   }
 
@@ -84,6 +88,7 @@ public class BoardService {
     List<BoardColumn> columns = columnRepository.findAllByBoardIdOrderByPositionAsc(boardId);
     int position = columns.isEmpty() ? 0 : columns.get(columns.size() - 1).getPosition() + 1;
     BoardColumn column = columnRepository.save(new BoardColumn(board, request.name(), position));
+    eventPublisher.publishBoardUpdate(boardId, "column.created", Map.of("columnId", column.getId(), "name", column.getName()));
     return new BoardDtos.ColumnResponse(column.getId(), column.getName(), column.getPosition());
   }
 }

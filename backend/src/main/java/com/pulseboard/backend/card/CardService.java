@@ -5,11 +5,13 @@ import com.pulseboard.backend.board.BoardColumn;
 import com.pulseboard.backend.board.BoardColumnRepository;
 import com.pulseboard.backend.card.dto.CardDtos;
 import com.pulseboard.backend.common.ApiException;
+import com.pulseboard.backend.events.BoardEventPublisher;
 import com.pulseboard.backend.user.User;
 import com.pulseboard.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -18,11 +20,13 @@ public class CardService {
   private final CardRepository cardRepository;
   private final BoardColumnRepository columnRepository;
   private final UserRepository userRepository;
+  private final BoardEventPublisher eventPublisher;
 
-  public CardService(CardRepository cardRepository, BoardColumnRepository columnRepository, UserRepository userRepository) {
+  public CardService(CardRepository cardRepository, BoardColumnRepository columnRepository, UserRepository userRepository, BoardEventPublisher eventPublisher) {
     this.cardRepository = cardRepository;
     this.userRepository = userRepository;
     this.columnRepository = columnRepository;
+    this.eventPublisher = eventPublisher;
   }
 
   @Transactional
@@ -41,6 +45,7 @@ public class CardService {
     int position = request.position() == null ? 0 : request.position();
     Card card = new Card(column, column.getBoard().getTenant(), request.title(), request.description(), request.priority() == null ? "MEDIUM" : request.priority(), assignee, request.labels(), request.dueAt(), position);
     card = cardRepository.save(card);
+    eventPublisher.publishBoardUpdate(card.getColumn().getBoard().getId(), "card.created", Map.of("cardId", card.getId(), "columnId", card.getColumn().getId()));
     return toResponse(card);
   }
 
@@ -60,6 +65,7 @@ public class CardService {
       card.setAssignee(assignee);
     }
     card.touch();
+    eventPublisher.publishBoardUpdate(card.getColumn().getBoard().getId(), "card.updated", Map.of("cardId", card.getId(), "columnId", card.getColumn().getId()));
     return toResponse(card);
   }
 
@@ -75,6 +81,7 @@ public class CardService {
     card.setColumn(column);
     card.setPosition(request.position());
     card.touch();
+    eventPublisher.publishBoardUpdate(column.getBoard().getId(), "card.moved", Map.of("cardId", card.getId(), "columnId", column.getId(), "position", request.position()));
     return toResponse(card);
   }
 
@@ -82,7 +89,9 @@ public class CardService {
   public void deleteCard(AuthPrincipal principal, UUID cardId) {
     Card card = cardRepository.findByIdAndTenantId(cardId, principal.tenantId())
         .orElseThrow(() -> ApiException.notFound("Card not found"));
+    UUID boardId = card.getColumn().getBoard().getId();
     cardRepository.delete(card);
+    eventPublisher.publishBoardUpdate(boardId, "card.deleted", Map.of("cardId", cardId));
   }
 
   @Transactional(readOnly = true)

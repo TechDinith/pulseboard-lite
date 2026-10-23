@@ -10,18 +10,16 @@ export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [register, { isLoading }] = useRegisterMutation();
+  const [register, { isLoading, isError }] = useRegisterMutation();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const res = await register({ tenantName, displayName, email, password }).unwrap() as { token: string };
-      if (typeof window !== "undefined") {
-        localStorage.setItem("pulseboard_token", res.token);
-      }
-      router.push("/");
+      const res = await register({ tenantName, displayName, email, password }).unwrap();
+      localStorage.setItem("pulseboard_token", res.token);
+      router.push("/boards");
     } catch {
-      // ignore
+      // error state rendered below
     }
   }
 
@@ -33,7 +31,8 @@ export default function RegisterPage() {
         <input className="rounded border p-2" placeholder="display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
         <input className="rounded border p-2" placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input className="rounded border p-2" placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        <button disabled={isLoading} className="rounded bg-black px-4 py-2 text-white">Register</button>
+        <button disabled={isLoading} className="rounded bg-black px-4 py-2 text-white disabled:opacity-50">Register</button>
+        {isError ? <p className="text-sm text-red-600">Could not register. Check your details.</p> : null}
       </form>
     </main>
   );

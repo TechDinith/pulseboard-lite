@@ -15,9 +15,9 @@ Working loop and continuation rules: see "How to continue" below.
 1. Frontend skeleton (Next.js + TS + Tailwind, static dashboard) â€” **DONE**
 2. Redux Toolkit + RTK Query â€” **DONE**
 3. Spring Boot + Postgres + JWT â€” **DONE**
-4. Multi-tenant boards/cards
-5. Polling
-6. Node SSE service fed by Redis Pub/Sub
+4. Multi-tenant boards/cards â€” **DONE**
+5. Polling â€” **DONE**
+6. Node SSE service fed by Redis Pub/Sub â€” **DONE**
 7. WebSockets
 8. SQS worker (export job)
 9. Docker, CI, README
@@ -42,26 +42,17 @@ topics â€” even if not asked.
 - Update this file at the end of every step.
 - Shell quirk: use `npm.cmd` / `npx.cmd` (PowerShell blocks the `.ps1` shims).
 
-## NEXT â€” Step 4: multi-tenant boards & cards
+## NEXT â€” Step 7: WebSockets
 
-Spring backend owns real domain data; the frontend switches off the mock API.
+Replace/augment SSE with a WebSocket channel for bidirectional updates.
 
-- **Schema** â€” Flyway `V2__boards_cards.sql`: `boards` (`tenant_id` FK, `name`),
-  `columns` (`board_id` FK, `position`), `cards` (`column_id` FK, `position`,
-  `title`, `description`, `priority`, `assignee_id` -> `users`, `labels`, `due_at`).
-- **Entities/repos**: `Board`, `BoardColumn`, `Card`.
-- **Tenant scoping (the interview topic for this step)**: every query filters by the
-  JWT's `tenant_id`. A user from tenant A asking for tenant B's board/column/card id
-  must get 403/404 â€” never data, never an existence leak.
-- **Endpoints** (all authenticated; CORS for `:3000` already configured):
-  `/api/boards` CRUD, `/api/boards/{id}/columns`, `/api/cards/{id}` CRUD plus move
-  (target column + position).
-- **Frontend**: RTK Query `baseUrl` -> `http://localhost:8080/api` via
-  `NEXT_PUBLIC_API_BASE_URL`; add `authApi` (login -> token, attached as Bearer in
-  `fetchBaseQuery` `prepareHeaders`); **delete the `app/api/*` mock handlers**.
-- **Revisit**: per-tenant email uniqueness (currently global, decided in Step 3).
-- After this: 5 polling -> 6 Node SSE + Redis Pub/Sub -> 7 WebSockets -> 8 SQS
-  worker -> 9 Docker/CI/README.
+- Backend (or a dedicated gateway) publishes board mutations to Redis; clients
+  subscribe to a board room and receive live events.
+- Keep tenant scoping identical to the REST API (JWT on connect, board membership
+  check).
+- Frontend: RTK Query cache invalidation driven by socket events; fallback polling
+  remains for reconnect gaps.
+- After this: 8 SQS worker -> 9 Docker/CI/README.
 
 ## Environment facts
 
@@ -281,7 +272,7 @@ services and CI/README paths.
   board a client component; data arrives via RTK Query, not SSR.
 
 
-## Step 4 — multi-tenant boards & cards (DONE)
+## Step 4 ï¿½ multi-tenant boards & cards (DONE)
 
 ### Backend (`backend/`)
 - Migrations: `V2__boards_cards.sql` (boards/columns/cards with tenant_id, indexes), `V3__per_tenant_email.sql` (unique (tenant_id,email), drop global unique).
@@ -299,7 +290,7 @@ services and CI/README paths.
 - Backend: `.\mvnw.cmd -B -DskipTests compile` SUCCESS (34 sources).
 - Frontend: `npx.cmd tsc --noEmit` clean; `next build` SUCCESS (routes /, /_not-found, /login, /register static).
 
-## Step 5 — Polling (DONE)
+## Step 5 ï¿½ Polling (DONE)
 
 ### Frontend (`frontend/`)
 - Added board detail route `/boards/[id]` (client component) using `useGetBoardDetailQuery` with `pollingInterval: 5000` to refresh board state periodically.
@@ -307,3 +298,37 @@ services and CI/README paths.
 
 ### Verification (Step 5)
 - Frontend: `npx.cmd tsc --noEmit` clean; `next build` SUCCESS (`/boards/[id]` dynamic).
+
+## Step 6 — Node SSE service + Redis Pub/Sub (DONE)
+
+### Backend (`backend/`)
+- `pom.xml`: added `spring-boot-starter-data-redis`.
+- `application.yml`: `spring.data.redis.host/port` from `REDIS_HOST`/`REDIS_PORT`.
+- `events/BoardEventPublisher` — serializes events with **Jackson 3** (`tools.jackson.databind.ObjectMapper`; Boot 4 does not ship `com.fasterxml`), publishes to Redis channel `board:<boardId>`.
+- `BoardService`/`CardService` publish `board.created`, `column.created`, `card.created|updated|moved|deleted` after mutations (board id resolved from the card's column).
+
+### SSE service (`sse-service/`)
+- `package.json` (ESM) — `express`, `cors`, `ioredis`.
+- `index.js` — `GET /events?boardId=...` streams `text/event-stream`; one Redis subscription per board shared by all connected clients; event name `board:update`, data = JSON message. `GET /health` returns `{status:"ok"}`. CORS restricted to `:3000`.
+- Default port 4000 (`PORT`), Redis URL via `REDIS_URL`.
+
+### Infra
+- `docker-compose.yml`: added `redis:7-alpine` (`pulseboard-redis`, :6379, healthcheck). Fixed the earlier bad append that put `redis` under `volumes`.
+
+### Frontend (`frontend/`)
+- `.env.local`: `NEXT_PUBLIC_SSE_URL=http://localhost:4000`.
+- `lib/use-board-events.ts` — client hook opening `EventSource`, listening for `board:update`; handler kept in a ref so re-renders don't reconnect; closes on unmount.
+- `/boards/[id]`: subscribes to SSE and calls RTK Query `refetch()` on events; polling kept at 30s as a safety net (SSE is primary).
+- Added `/boards` (list + create), home `/` redirects to `/boards`; auth pages use typed RTK Query results.
+- `apiSlice` fully typed (no `any`) — `AuthResult`, `BoardSummary`, `BoardDetail`, `CardSummary`, `ColumnWithCards`, create/update/move inputs.
+- Removed the leftover mock-only UI path from the active routes.
+
+### Verification (Step 6)
+- Backend: `.\mvnw.cmd -B -DskipTests compile` SUCCESS (35 sources).
+- Frontend: `npx.cmd tsc --noEmit` clean; `eslint .` clean; `next build` SUCCESS
+  (`/`, `/boards`, `/login`, `/register` static; `/boards/[id]` dynamic).
+- SSE service: `npm install` OK; `node index.js` starts on :4000 and `/health` ? `{"status":"ok"}`.
+- **Not runtime-tested end-to-end**: Docker Desktop was not running during verification
+  (Postgres/Redis containers could not start), so the full publish ? SSE ? refetch loop
+  is unverified. Start Docker Desktop, `docker compose up -d`, backend, `sse-service`,
+  then create a card to observe it.
