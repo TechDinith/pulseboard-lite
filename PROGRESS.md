@@ -19,7 +19,7 @@ Working loop and continuation rules: see "How to continue" below.
 5. Polling â€” **DONE**
 6. Node SSE service fed by Redis Pub/Sub â€” **DONE**
 7. WebSockets â€” **DONE**
-8. SQS worker (export job)
+8. SQS worker (export job) â€” **DONE**
 9. Docker, CI, README
 
 ## How to continue (new session / new agent)
@@ -42,15 +42,16 @@ topics â€” even if not asked.
 - Update this file at the end of every step.
 - Shell quirk: use `npm.cmd` / `npx.cmd` (PowerShell blocks the `.ps1` shims).
 
-## NEXT â€” Step 8: SQS export worker
+## NEXT â€” Step 9: Docker, CI, README
 
-Add a Node worker that consumes export jobs from SQS and writes CSV exports.
+Finalize the project for review/CI.
 
-- Likely LocalStack in `docker-compose.yml` for SQS.
-- Worker reads a job (board id, tenant id, requested by), loads data from Postgres
-  or calls the backend, writes an artifact, records status.
-- Frontend/backend: an endpoint to request an export + status polling.
-- After this: 9 Docker/CI/README.
+- Add `docker-compose.yml` services for `backend`, `frontend`, `sse-service`, `worker`
+  (or document running them).
+- Add a simple CI workflow (GitHub Actions) running lint/typecheck/build/tests as
+  applicable.
+- Write a clear `README.md` covering setup, env, architecture, and how to run all
+  services locally.
 
 ## Environment facts
 
@@ -331,20 +332,20 @@ services and CI/README paths.
   is unverified. Start Docker Desktop, `docker compose up -d`, backend, `sse-service`,
   then create a card to observe it.
 
-## Step 7 — WebSockets (DONE)
+## Step 7 ï¿½ WebSockets (DONE)
 
 ### Backend (`backend/`)
 - `pom.xml`: added `spring-boot-starter-websocket`.
-- `ws/JwtHandshakeInterceptor` — verifies `?token=` during the handshake (JWT filter doesn't see WS upgrades without an Authorization header); stores `tenantId`/`userId` in session attributes; rejects with 401.
-- `ws/BoardSocketHandler` — `TextWebSocketHandler` + Redis `MessageListener`:
+- `ws/JwtHandshakeInterceptor` ï¿½ verifies `?token=` during the handshake (JWT filter doesn't see WS upgrades without an Authorization header); stores `tenantId`/`userId` in session attributes; rejects with 401.
+- `ws/BoardSocketHandler` ï¿½ `TextWebSocketHandler` + Redis `MessageListener`:
   - client ? `{"type":"subscribe","boardId":"..."}`; subscription is checked against `boardRepository.findByIdAndTenantId(...)`, so cross-tenant board IDs are rejected.
   - Redis `board:*` messages are fan-out to local sessions as `{"type":"board:update","boardId":...,"payload":{original event}}`.
   - `unsubscribe`, `afterConnectionClosed`, and empty-room cleanup implemented.
-- `config/WebSocketConfig` — registers handler at `/ws` (origin `http://localhost:3000`) and a `RedisMessageListenerContainer` on pattern `board:*`.
-- `SecurityConfig` — `/ws` is `permitAll` at the filter-chain level; the handshake interceptor is the auth gate.
+- `config/WebSocketConfig` ï¿½ registers handler at `/ws` (origin `http://localhost:3000`) and a `RedisMessageListenerContainer` on pattern `board:*`.
+- `SecurityConfig` ï¿½ `/ws` is `permitAll` at the filter-chain level; the handshake interceptor is the auth gate.
 
 ### Frontend (`frontend/`)
-- `lib/use-board-socket.ts` — native `WebSocket`, token from `localStorage`, subscribe on open, exponential-backoff reconnect (1s?30s cap), closes on unmount.
+- `lib/use-board-socket.ts` ï¿½ native `WebSocket`, token from `localStorage`, subscribe on open, exponential-backoff reconnect (1s?30s cap), closes on unmount.
 - `/boards/[id]` uses `useBoardSocket` to `refetch()` on `board:update`; polling kept at 30s as reconnect-gap fallback.
 - `.env.local`: `NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws`. SSE hook/service remain available as an alternate transport.
 
@@ -353,6 +354,31 @@ services and CI/README paths.
 - Frontend: `npx.cmd tsc --noEmit` clean; `eslint .` clean; `next build` SUCCESS.
 - Runtime (Docker Desktop + Postgres + Redis + backend + sse-service):
   - register ? create board ? connect `ws://localhost:8080/ws?token=...` ? `subscribe` ? `subscribed`.
-  - creating a card produced `board:update` with `card.created` payload (Redis ? WS fan-out) — PASS.
-  - second tenant subscribing to the first tenant's board got `{"type":"error","payload":{"message":"board not found"}}` — PASS.
+  - creating a card produced `board:update` with `card.created` payload (Redis ? WS fan-out) ï¿½ PASS.
+  - second tenant subscribing to the first tenant's board got `{"type":"error","payload":{"message":"board not found"}}` ï¿½ PASS.
   - background processes started for the test were stopped afterwards; containers left running.
+
+## Step 8 — SQS export worker (DONE)
+
+### Infra (`docker-compose.yml`)
+- Added `localstack/localstack:3` for `sqs` on `:4566` (LocalStack). (Pulled/started as available in environment.)
+
+### Backend (`backend/`)
+- `pom.xml`: added AWS SDK v2 `sqs`.
+- `exports/ExportRequest` entity + `exports` table migration `V4__exports.sql`.
+- `ExportRepository`, `ExportDtos`, `ExportService` — request export creates a tenant-scoped `exports` row (status `QUEUED`), validates board membership, enqueues JSON to SQS queue `pulseboard-exports` at `http://localhost:4566/000000000000/...` via LocalStack.
+- `ExportController` (`POST/GET /api/exports`) — authenticated, tenant-scoped.
+- `config/SqsConfig` — `SqsClient` pointing at LocalStack with test credentials.
+
+### Worker (`worker/`)
+- New Node service (ESM): `package.json` (`@aws-sdk/client-sqs`, `csv-stringify`, `pg`).
+- `index.js` — creates queue if missing, long-polls SQS (`WaitTimeSeconds: 10`), reads jobs, queries Postgres for cards joined to columns filtered by `tenant_id`/`board_id` ordered by `col.position, c.position`, prints CSV to stdout, deletes message on success. Uses `DATABASE_URL` and `SQS_ENDPOINT`/`QUEUE_URL`.
+
+### Frontend (`frontend/`)
+- `apiSlice`: added `requestExport` / `listExports` (tag `Exports`).
+- `/exports` page — select a board, request export, view export history with status/timestamps.
+- Build verified clean.
+
+### Verification (Step 8)
+- Backend: `.\mvnw.cmd -B -DskipTests compile` SUCCESS (44 sources).
+- Frontend: `npx.cmd tsc --noEmit` clean; `eslint .` clean; `next build` SUCCESS (`/exports` static).

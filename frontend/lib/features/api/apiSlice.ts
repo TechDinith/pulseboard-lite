@@ -83,6 +83,13 @@ export interface MoveCardInput {
   position: number;
 }
 
+export interface ExportResponse {
+  id: string;
+  boardId: string;
+  status: string;
+  createdAt: string;
+}
+
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api",
   prepareHeaders: (headers) => {
@@ -99,7 +106,7 @@ const baseQuery = fetchBaseQuery({
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery,
-  tagTypes: ["Members", "Board", "Activity", "Boards"],
+  tagTypes: ["Members", "Board", "Activity", "Boards", "Exports"],
   endpoints: (builder) => ({
     getMembers: builder.query<Member[], void>({
       query: () => "/members",
@@ -154,6 +161,14 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/cards/${id}`, method: "DELETE" }),
       invalidatesTags: ["Board"],
     }),
+    requestExport: builder.mutation<ExportResponse, { boardId: string }>({
+      query: (body) => ({ url: "/exports", method: "POST", body }),
+      invalidatesTags: ["Exports"],
+    }),
+    listExports: builder.query<ExportResponse[], void>({
+      query: () => "/exports",
+      providesTags: ["Exports"],
+    }),
   }),
 });
 
@@ -172,4 +187,6 @@ export const {
   useUpdateCardMutation,
   useMoveCardMutation,
   useDeleteCardMutation,
+  useRequestExportMutation,
+  useListExportsQuery,
 } = apiSlice;

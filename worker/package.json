@@ -1,0 +1,14 @@
+{
+  "name": "pulseboard-worker",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.682.0",
+    "csv-stringify": "^6.5.1",
+    "pg": "^8.13.1"
+  }
+}
