@@ -298,3 +298,12 @@ services and CI/README paths.
 ### Verification (Step 4)
 - Backend: `.\mvnw.cmd -B -DskipTests compile` SUCCESS (34 sources).
 - Frontend: `npx.cmd tsc --noEmit` clean; `next build` SUCCESS (routes /, /_not-found, /login, /register static).
+
+## Step 5 — Polling (DONE)
+
+### Frontend (`frontend/`)
+- Added board detail route `/boards/[id]` (client component) using `useGetBoardDetailQuery` with `pollingInterval: 5000` to refresh board state periodically.
+- RTK Query polling leverages existing tags/cache; works with Spring `/api/boards/{id}`.
+
+### Verification (Step 5)
+- Frontend: `npx.cmd tsc --noEmit` clean; `next build` SUCCESS (`/boards/[id]` dynamic).
