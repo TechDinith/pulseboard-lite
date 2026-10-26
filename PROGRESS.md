@@ -42,16 +42,14 @@ topics â€” even if not asked.
 - Update this file at the end of every step.
 - Shell quirk: use `npm.cmd` / `npx.cmd` (PowerShell blocks the `.ps1` shims).
 
-## NEXT â€” Step 9: Docker, CI, README
+## NEXT â€” Step 9: Docker, CI, README (DONE)
 
-Finalize the project for review/CI.
+Finalized the project for review/CI.
 
-- Add `docker-compose.yml` services for `backend`, `frontend`, `sse-service`, `worker`
-  (or document running them).
-- Add a simple CI workflow (GitHub Actions) running lint/typecheck/build/tests as
-  applicable.
-- Write a clear `README.md` covering setup, env, architecture, and how to run all
-  services locally.
+- Documentation: Added comprehensive `README.md` detailing architecture, setup, and local run procedures.
+- CI: Created `.github/workflows/ci.yml` running linting, typechecking, and build for all services.
+- Docker: Existing `docker-compose.yml` provides necessary infrastructure (Postgres, Redis, LocalStack). Application services are documented for local execution in `README.md`.
+
 
 ## Environment facts
 
@@ -358,7 +356,7 @@ services and CI/README paths.
   - second tenant subscribing to the first tenant's board got `{"type":"error","payload":{"message":"board not found"}}` ï¿½ PASS.
   - background processes started for the test were stopped afterwards; containers left running.
 
-## Step 8 — SQS export worker (DONE)
+## Step 8 ï¿½ SQS export worker (DONE)
 
 ### Infra (`docker-compose.yml`)
 - Added `localstack/localstack:3` for `sqs` on `:4566` (LocalStack). (Pulled/started as available in environment.)
@@ -366,17 +364,17 @@ services and CI/README paths.
 ### Backend (`backend/`)
 - `pom.xml`: added AWS SDK v2 `sqs`.
 - `exports/ExportRequest` entity + `exports` table migration `V4__exports.sql`.
-- `ExportRepository`, `ExportDtos`, `ExportService` — request export creates a tenant-scoped `exports` row (status `QUEUED`), validates board membership, enqueues JSON to SQS queue `pulseboard-exports` at `http://localhost:4566/000000000000/...` via LocalStack.
-- `ExportController` (`POST/GET /api/exports`) — authenticated, tenant-scoped.
-- `config/SqsConfig` — `SqsClient` pointing at LocalStack with test credentials.
+- `ExportRepository`, `ExportDtos`, `ExportService` ï¿½ request export creates a tenant-scoped `exports` row (status `QUEUED`), validates board membership, enqueues JSON to SQS queue `pulseboard-exports` at `http://localhost:4566/000000000000/...` via LocalStack.
+- `ExportController` (`POST/GET /api/exports`) ï¿½ authenticated, tenant-scoped.
+- `config/SqsConfig` ï¿½ `SqsClient` pointing at LocalStack with test credentials.
 
 ### Worker (`worker/`)
 - New Node service (ESM): `package.json` (`@aws-sdk/client-sqs`, `csv-stringify`, `pg`).
-- `index.js` — creates queue if missing, long-polls SQS (`WaitTimeSeconds: 10`), reads jobs, queries Postgres for cards joined to columns filtered by `tenant_id`/`board_id` ordered by `col.position, c.position`, prints CSV to stdout, deletes message on success. Uses `DATABASE_URL` and `SQS_ENDPOINT`/`QUEUE_URL`.
+- `index.js` ï¿½ creates queue if missing, long-polls SQS (`WaitTimeSeconds: 10`), reads jobs, queries Postgres for cards joined to columns filtered by `tenant_id`/`board_id` ordered by `col.position, c.position`, prints CSV to stdout, deletes message on success. Uses `DATABASE_URL` and `SQS_ENDPOINT`/`QUEUE_URL`.
 
 ### Frontend (`frontend/`)
 - `apiSlice`: added `requestExport` / `listExports` (tag `Exports`).
-- `/exports` page — select a board, request export, view export history with status/timestamps.
+- `/exports` page ï¿½ select a board, request export, view export history with status/timestamps.
 - Build verified clean.
 
 ### Verification (Step 8)
