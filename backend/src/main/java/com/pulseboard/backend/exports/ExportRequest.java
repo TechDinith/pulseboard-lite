@@ -33,6 +33,9 @@ public class ExportRequest {
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
 
+  @Column(columnDefinition = "text")
+  private String content;
+
   protected ExportRequest() {
   }
 
@@ -72,5 +75,19 @@ public class ExportRequest {
 
   public OffsetDateTime getUpdatedAt() {
     return updatedAt;
+  }
+
+  public String getContent() {
+    return content;
+  }
+
+  public void setContent(String content) {
+    this.content = content;
+    this.updatedAt = OffsetDateTime.now();
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
+    this.updatedAt = OffsetDateTime.now();
   }
 }

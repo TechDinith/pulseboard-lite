@@ -7,7 +7,8 @@ import { useListBoardsQuery, useCreateBoardMutation } from "@/lib/features/api/a
 
 function BoardsContent() {
   const { data: boards, isLoading, isError, refetch } = useListBoardsQuery();
-  const [createBoard, { isLoading: isCreating }] = useCreateBoardMutation();
+  const [createBoard, { isLoading: isCreating, isError: createError, error: createErr }] = useCreateBoardMutation();
+  const createErrorMessage = createError ? (createErr as any)?.data?.message || "Failed to create board." : null;
   const [name, setName] = useState("");
 
   async function onCreate(e: React.FormEvent) {
@@ -20,7 +21,7 @@ function BoardsContent() {
   if (isLoading) return <div className="p-6 text-zinc-500">Loading boards...</div>;
 
   return (
-    <main className="mx-auto w-full max-w-4xl p-8">
+    <div className="mx-auto h-full w-full max-w-4xl overflow-y-auto p-8">
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           Your Boards
@@ -44,6 +45,9 @@ function BoardsContent() {
           {isCreating ? "Creating..." : "Create Board"}
         </button>
       </form>
+      {createErrorMessage ? (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{createErrorMessage}</p>
+      ) : null}
 
       {isError ? (
         <div className="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400">
@@ -72,15 +76,17 @@ function BoardsContent() {
           ) : null}
         </ul>
       )}
-    </main>
+    </div>
   );
 }
 
+import { AppLayout } from "@/components/app-layout";
+
 export default function BoardsPage() {
   return (
-    <ProtectedRoute>
+    <AppLayout>
       <BoardsContent />
-    </ProtectedRoute>
+    </AppLayout>
   );
 }
 

@@ -6,6 +6,7 @@ import { useGetBoardDetailQuery } from "@/lib/features/api/apiSlice";
 import { useBoardSocket } from "@/lib/use-board-socket";
 import { Board } from "@/components/board";
 import { ProtectedRoute } from "@/components/protected-route";
+import { AppLayout } from "@/components/app-layout";
 
 function BoardDetailContent() {
   const params = useParams();
@@ -25,16 +26,16 @@ function BoardDetailContent() {
   if (error || !data) return <main className="p-6">Error loading board.</main>;
 
   return (
-    <main className="flex h-screen flex-col p-6">
+    <div className="flex h-full flex-col overflow-hidden p-6">
       <Board board={data} isFetching={isFetching} refetch={refetch} />
-    </main>
+    </div>
   );
 }
 
 export default function BoardDetailPage() {
   return (
-    <ProtectedRoute>
+    <AppLayout>
       <BoardDetailContent />
-    </ProtectedRoute>
+    </AppLayout>
   );
 }

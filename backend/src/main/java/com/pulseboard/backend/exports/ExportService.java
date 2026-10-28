@@ -59,4 +59,14 @@ public class ExportService {
         .map(e -> new ExportDtos.ExportResponse(e.getId(), e.getBoardId(), e.getStatus(), e.getCreatedAt()))
         .toList();
   }
+
+  @Transactional(readOnly = true)
+  public String getExportContent(AuthPrincipal principal, UUID exportId) {
+    ExportRequest export = exportRepository.findByIdAndTenantId(exportId, principal.tenantId())
+        .orElseThrow(() -> ApiException.notFound("Export not found"));
+    if (export.getContent() == null) {
+      throw ApiException.badRequest("export_not_ready", "Export is not ready yet");
+    }
+    return export.getContent();
+  }
 }

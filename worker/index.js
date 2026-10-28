@@ -22,7 +22,7 @@ async function ensureQueue() {
 }
 
 async function processJob(job) {
-  const { boardId, tenantId, requestedBy } = job;
+  const { exportId, boardId, tenantId, requestedBy } = job;
   const client = await pool.connect();
   try {
     const res = await client.query(
@@ -35,8 +35,18 @@ async function processJob(job) {
     );
     const records = res.rows;
     const csv = stringify(records, { header: true });
-    console.log(JSON.stringify({ status: "completed", boardId, tenantId, requestedBy, count: records.length }));
+    await client.query(
+      `update exports set status = $1, content = $2, updated_at = now() where id = $3`,
+      ["COMPLETED", csv, exportId]
+    );
+    console.log(JSON.stringify({ status: "completed", exportId, boardId, tenantId, requestedBy, count: records.length }));
     console.log(csv);
+  } catch (err) {
+    await client.query(
+      `update exports set status = $1, updated_at = now() where id = $2`,
+      ["FAILED", exportId]
+    );
+    throw err;
   } finally {
     client.release();
   }

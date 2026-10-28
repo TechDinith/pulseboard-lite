@@ -1,4 +1,5 @@
-import type { Card, Member } from "@/types";
+import type { CardSummary } from "@/lib/features/api/apiSlice";
+import type { Member } from "@/types";
 import { Avatar } from "./avatar";
 import { PriorityBadge } from "./priority-badge";
 
@@ -6,7 +7,7 @@ export function TaskCard({
   card,
   assignee,
 }: {
-  card: Card;
+  card: CardSummary;
   assignee?: Member;
 }) {
   return (
@@ -24,14 +25,14 @@ export function TaskCard({
         </p>
       ) : null}
 
-      {card.labels.length > 0 ? (
+      {card.labels ? (
         <ul className="mt-2 flex flex-wrap gap-1">
-          {card.labels.map((label) => (
+          {card.labels.split(",").map((label) => (
             <li
               key={label}
               className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
             >
-              {label}
+              {label.trim()}
             </li>
           ))}
         </ul>
@@ -39,22 +40,11 @@ export function TaskCard({
 
       <footer className="mt-3 flex items-center justify-between">
         <PriorityBadge priority={card.priority} />
-        <span className="inline-flex items-center gap-1 text-[11px] text-zinc-400">
-          <svg
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="h-3.5 w-3.5"
-            aria-hidden="true"
-          >
-            <path
-              d="M2.5 3.5h11v7h-6l-3 2.5V10.5h-2z"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {card.commentCount}
-        </span>
+        {card.dueAt && (
+          <span className="text-[11px] text-zinc-400">
+            {new Date(card.dueAt).toLocaleDateString()}
+          </span>
+        )}
       </footer>
     </article>
   );

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useGetMembersQuery } from "@/lib/features/api/apiSlice";
-import type { Member } from "@/types";
 import { Avatar } from "./avatar";
 import { BoardColumn } from "./board-column";
-import { BoardDetail } from "@/lib/features/api/apiSlice";
+import { BoardDetail, ColumnWithCards } from "@/lib/features/api/apiSlice";
+import type { Member } from "@/types";
+import { AddColumnModal } from "./add-column-modal";
 
 export function Board({
   board,
@@ -31,6 +32,7 @@ export function Board({
     0,
   );
   const team = members ?? [];
+  const [showColumnModal, setShowColumnModal] = useState(false);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
@@ -63,18 +65,22 @@ export function Board({
           </div>
           <button
             type="button"
+            onClick={() => setShowColumnModal(true)}
             className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
           >
-            New card
+            + Add column
           </button>
+          {showColumnModal ? (
+            <AddColumnModal boardId={board.id} onClose={() => setShowColumnModal(false)} />
+          ) : null}
         </div>
       </header>
 
       <div className="flex flex-1 gap-4 overflow-x-auto pb-4">
-        {board.columns.map((column) => (
+        {board.columns.map((column: ColumnWithCards) => (
           <BoardColumn
             key={column.id}
-            column={column as any} // Quick fix for type mismatch
+            column={column}
             membersById={membersById}
           />
         ))}

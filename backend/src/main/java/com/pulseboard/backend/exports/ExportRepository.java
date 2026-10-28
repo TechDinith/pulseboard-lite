@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface ExportRepository extends JpaRepository<ExportRequest, UUID> {
   List<ExportRequest> findAllByTenantIdOrderByCreatedAtDesc(UUID tenantId);
+  java.util.Optional<ExportRequest> findByIdAndTenantId(UUID id, UUID tenantId);
 }

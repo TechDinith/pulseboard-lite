@@ -9,17 +9,20 @@ export function Avatar({
   member,
   size = "md",
 }: {
-  member: Member;
+  member: Partial<Member> & { name: string; initials?: string };
   size?: keyof typeof sizes;
 }) {
+  const initials = member.initials || member.name.charAt(0).toUpperCase();
+  const color = member.color || "#6366f1";
+
   return (
     <span
       className={`grid shrink-0 select-none place-items-center rounded-full font-semibold text-white ${sizes[size]}`}
-      style={{ backgroundColor: member.color }}
+      style={{ backgroundColor: color }}
       title={member.name}
       aria-label={member.name}
     >
-      {member.initials}
+      {initials}
     </span>
   );
 }
