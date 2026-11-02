@@ -4,12 +4,14 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useGetMeQuery, useGetMembersQuery } from "@/lib/features/api/apiSlice";
 import { Avatar } from "./avatar";
+import { useSearch } from "@/lib/search-context";
 
 export function AppHeader() {
   const { data: user } = useGetMeQuery();
   const { data: members } = useGetMembersQuery();
   const router = useRouter();
   const pathname = usePathname();
+  const { query, setQuery } = useSearch();
 
   function logout() {
     localStorage.removeItem("pulseboard_token");
@@ -100,6 +102,8 @@ export function AppHeader() {
           id="card-search"
           type="search"
           placeholder="Search cards…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           className="w-56 rounded-md border border-zinc-200 bg-zinc-50 py-1.5 pl-8 pr-3 text-sm outline-none transition-colors focus:border-indigo-500 focus:bg-white dark:border-zinc-800 dark:bg-zinc-900 dark:focus:bg-zinc-900"
         />
       </div>

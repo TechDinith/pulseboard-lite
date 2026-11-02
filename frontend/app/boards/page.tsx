@@ -4,12 +4,18 @@ import Link from "next/link";
 import { useState } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useListBoardsQuery, useCreateBoardMutation } from "@/lib/features/api/apiSlice";
+import { useSearch } from "@/lib/search-context";
 
 function BoardsContent() {
   const { data: boards, isLoading, isError, refetch } = useListBoardsQuery();
   const [createBoard, { isLoading: isCreating, isError: createError, error: createErr }] = useCreateBoardMutation();
   const createErrorMessage = createError ? (createErr as any)?.data?.message || "Failed to create board." : null;
   const [name, setName] = useState("");
+  const { query } = useSearch();
+
+  const filteredBoards = (boards ?? []).filter((b) =>
+    b.name.toLowerCase().includes(query.toLowerCase())
+  );
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -58,7 +64,7 @@ function BoardsContent() {
         </div>
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {(boards ?? []).map((b) => (
+          {filteredBoards.map((b) => (
             <li key={b.id}>
               <Link
                 href={`/boards/${b.id}`}
@@ -69,7 +75,11 @@ function BoardsContent() {
               </Link>
             </li>
           ))}
-          {(boards ?? []).length === 0 ? (
+          {filteredBoards.length === 0 && query.trim() ? (
+            <li className="col-span-full py-12 text-center text-zinc-500">
+              No boards match &quot;{query}&quot;
+            </li>
+          ) : filteredBoards.length === 0 ? (
             <li className="col-span-full py-12 text-center text-zinc-500">
               No boards yet. Create your first one above.
             </li>
