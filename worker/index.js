@@ -1,5 +1,5 @@
 import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, CreateQueueCommand } from "@aws-sdk/client-sqs";
-import { stringify } from "csv-stringify";
+import { stringify } from "csv-stringify/sync";
 import pkg from "pg";
 const { Pool } = pkg;
 
