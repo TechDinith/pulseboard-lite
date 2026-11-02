@@ -1,6 +1,6 @@
 # PulseBoard Lite
 
-> **Multi-tenant team task board** — a full-stack portfolio project demonstrating modern distributed system architecture.
+> **Multi-tenant team task board**
 
 PulseBoard Lite is a real-time, multi-tenant task board (think Trello/Jira-lite) built as a polyglot monorepo. It showcases authentication, multi-tenancy, real-time WebSocket/SSE updates, async job processing via SQS, and a modern React frontend — all wired together with Docker and CI/CD.
 
@@ -332,17 +332,6 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs on push/PR to `main`:
 
 ---
 
-## Interview Talking Points
-
-1. **"How does real-time work?"** -> Backend publishes to Redis -> SSE service fans out -> WebSocket clients receive -> RTK Query refetches
-2. **"How is multi-tenancy implemented?"** -> Shared DB, shared schema, row-level isolation via `tenant_id`. JWT carries `tenantId`. Every query filters by it.
-3. **"How does drag-and-drop persist?"** -> @dnd-kit handles UI drag. On drop, PATCH updates backend. Backend publishes event. All clients refetch.
-4. **"How does the export worker work?"** -> Backend enqueues to SQS. Worker long-polls. Processes job, updates DB, deletes message. Frontend polls status.
-5. **"Why hand-rolled JWT?"** -> Spring Boot 4 brought Jackson 3 and modular starters. JJWT had version conflicts. Hand-rolled HS256 with `javax.crypto.Mac` is ~50 lines, zero deps, constant-time comparison prevents timing attacks.
-6. **"How does RTK Query handle caching?"** -> Tag-based invalidation. Mutations invalidate tags -> auto-refetch. Deduplicates concurrent requests.
-
----
-
 ## Project Structure
 
 ```
@@ -357,7 +346,3 @@ pulseboard-lite/
 +-- AGENTS.md          # Monorepo map
 +-- PROGRESS.md        # Build history & notes
 ```
-
----
-
-*Built as a portfolio project to demonstrate full-stack, distributed system architecture.*
